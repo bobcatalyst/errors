@@ -9,7 +9,7 @@ type (
 	UnwrapError interface{ Unwrap() error }
 	// UnwrapErrors is a defined type for Unwrapping a multiple errors.
 	UnwrapErrors interface{ Unwrap() []error }
-	Asable       interface{ As(any) bool }
+	Castable     interface{ As(any) bool }
 )
 
 // Check panics if err == nil.
