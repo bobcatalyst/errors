@@ -36,7 +36,8 @@ func New(format string, values ...any) error {
 
 	err.Text = format
 	format = strings.ReplaceAll(format, "%w", "%v")
-	if len(values) > 0 { // Fix format string and format
+	if len(values) > 0 && strings.Contains(format, "%") {
+		// Fix format string and format
 		err.Text = fmt.Sprintf(format, values...)
 	}
 
