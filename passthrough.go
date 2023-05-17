@@ -4,9 +4,6 @@ package errors
 
 import "errors"
 
-// New functions the same as [errors.New].
-func New(text string) error { return errors.New(text) }
-
 // Is functions the same as [errors.Is].
 func Is(err, target error) bool { return errors.Is(err, target) }
 

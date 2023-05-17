@@ -12,6 +12,11 @@ type (
 	Castable     interface{ As(any) bool }
 )
 
+// New functions the same as [errors.New].
+// The function now accepts a vararg of errors to wrap.
+// The returned error can be unwrapped with [UnwrapErrors].
+func New(text string, err ...error) error { return Join(errors.New(text), Join(err...)) }
+
 // Check panics if err == nil.
 func Check(err error) {
 	if err != nil {
