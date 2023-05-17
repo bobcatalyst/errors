@@ -2,6 +2,9 @@ package errors
 
 import (
 	"errors"
+	"fmt"
+	"runtime"
+	"strings"
 )
 
 type (
@@ -12,10 +15,32 @@ type (
 	Castable     interface{ As(any) bool }
 )
 
+type Error struct {
+	Text     string
+	Errors   []error
+	Line     int
+	Filename string
+}
+
+func (err *Error) Error() string   { return Join(errors.New(err.Text), Join(err.Errors...)).Error() }
+func (err *Error) Unwrap() []error { return err.Errors }
+
 // New functions the same as [errors.New].
-// The function now accepts a vararg of errors to wrap.
-// The returned error can be unwrapped with [UnwrapErrors].
-func New(text string, err ...error) error { return Join(errors.New(text), Join(err...)) }
+// If len(values) > 0, format will be used as a format string with values.
+// The format string will have all '%w' replaced with '%v', and be used with [fmt.Sprintf].
+// If any element in values is an error, it will be present in the slice returned by Unwraps.
+func New(format string, values ...any) error {
+	var err Error
+	format = strings.ReplaceAll(format, "%w", "%v")
+	err.Text = fmt.Sprintf(format, values...)
+	_, err.Filename, err.Line, _ = runtime.Caller(1)
+	for _, e := range values {
+		if e, ok := e.(error); ok {
+			err.Errors = append(err.Errors, e)
+		}
+	}
+	return &err
+}
 
 // Check panics if err == nil.
 func Check(err error) {
