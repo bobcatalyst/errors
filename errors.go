@@ -31,9 +31,16 @@ func (err *Error) Unwrap() []error { return err.Errors }
 // If any element in values is an error, it will be present in the slice returned by Unwraps.
 func New(format string, values ...any) error {
 	var err Error
-	format = strings.ReplaceAll(format, "%w", "%v")
-	err.Text = fmt.Sprintf(format, values...)
+	// Helpful information
 	_, err.Filename, err.Line, _ = runtime.Caller(1)
+
+	err.Text = format
+	format = strings.ReplaceAll(format, "%w", "%v")
+	if len(values) > 0 { // Fix format string and format
+		err.Text = fmt.Sprintf(format, values...)
+	}
+
+	// Get errors for Unwrap
 	for _, e := range values {
 		if e, ok := e.(error); ok {
 			err.Errors = append(err.Errors, e)
