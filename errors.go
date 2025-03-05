@@ -3,7 +3,9 @@ package errors
 import (
     "errors"
     "fmt"
+    "github.com/bobcatalyst/debug"
     "runtime"
+    "strconv"
     "strings"
 )
 
@@ -13,16 +15,36 @@ type (
     // UnwrapErrors is a defined type for Unwrapping a multiple errors.
     UnwrapErrors interface{ Unwrap() []error }
     Castable     interface{ As(any) bool }
+    Comparable   interface{ Is(error) bool }
 )
 
 type Error struct {
     Text     string
+    Values   []any
     Errors   []error
     Line     int
     Filename string
 }
 
-func (err *Error) Error() string   { return Join(errors.New(err.Text), Join(err.Errors...)).Error() }
+func (err *Error) Error() string {
+    var sb strings.Builder
+    if debug.Debug {
+        sb.WriteRune('{')
+        sb.WriteString(err.Filename)
+        sb.WriteRune(':')
+        sb.WriteString(strconv.Itoa(err.Line))
+        sb.WriteString("} ")
+    }
+
+    _, _ = fmt.Fprintf(&sb, err.Text, err.Values...)
+
+    for _, e := range err.Errors {
+        _, _ = fmt.Fprintf(&sb, " \\\n\t%v", e)
+    }
+
+    return sb.String()
+}
+
 func (err *Error) Unwrap() []error { return err.Errors }
 
 // New functions the same as [errors.New].
@@ -30,15 +52,13 @@ func (err *Error) Unwrap() []error { return err.Errors }
 // The format string will have all '%w' replaced with '%v', and be used with [fmt.Sprintf].
 // If any element in values is an error, it will be present in the slice returned by Unwraps.
 func New(format string, values ...any) error {
-    var err Error
-    // Helpful information
-    _, err.Filename, err.Line, _ = runtime.Caller(1)
+    err := Error{
+        Text:   strings.ReplaceAll(format, "%w", "%v"),
+        Values: values,
+    }
 
-    err.Text = format
-    format = strings.ReplaceAll(format, "%w", "%v")
-    if len(values) > 0 && strings.Contains(format, "%") {
-        // Fix format string and format
-        err.Text = fmt.Sprintf(format, values...)
+    if debug.Debug {
+        _, err.Filename, err.Line, _ = runtime.Caller(1)
     }
 
     // Get errors for Unwrap
@@ -57,8 +77,8 @@ func Check(err error) {
     }
 }
 
-// Get panics if err == nil, returning t otherwise.
-func Get[T any](t T, err error) T {
+// Must panics if err == nil, returning t otherwise.
+func Must[T any](t T, err error) T {
     Check(err)
     return t
 }
@@ -87,29 +107,20 @@ func To[E error](err error) (e E, ok bool) {
     return
 }
 
-// Catch attempts to recover from a panic.
-// If it succeeds, and the panic was and error, and the panic contains the specified error fn is run.
-// If fn returns an error it will be thrown.
-// If fn returns nil no more panics will be thrown.
-func Catch(target error, fn func(original error) error) {
-    if r := recover(); r != nil {
-        if err, ok := r.(error); ok {
-            if Is(err, target) {
-                if err = fn(err); err != nil {
-                    panic(err)
-                }
-                return
-            }
-        }
-        panic(r)
-    }
-}
-
-// OnFail return two functions. defr should be deferred immediately.
-// If the caller returns before success is called, fn will be called.
-func OnFail(fn func()) (success func(), defr func()) {
+// OnFail runs the functions supplied to onFail until success is called.
+// Usage:
+//   ok, onFail := errors.OnFail()
+//   f := errors.Must(os.Create('file.txt'))
+//   defer onFail(func() {
+//     if err := f.Close(); err != nil {
+//       slog.Error("failed to write file", "error", err)
+//     }
+//   })
+//   errors.Must(f.Write([]byte("Hello World"))
+//   ok()
+func OnFail() (success func(), onFail func(func())) {
     fail := true
-    return func() { fail = false }, func() {
+    return func() { fail = false }, func(fn func()) {
         if fail {
             fn()
         }

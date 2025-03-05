@@ -4,6 +4,8 @@ package errors
 
 import "errors"
 
+var ErrUnsupported = errors.ErrUnsupported
+
 // Is functions the same as [errors.Is].
 func Is(err, target error) bool { return errors.Is(err, target) }
 
