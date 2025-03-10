@@ -1,4 +1,4 @@
-module github.com/trymoose/errors
+module github.com/bobcatalyst/errors
 
 go 1.24
 
